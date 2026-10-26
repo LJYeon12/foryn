@@ -1,0 +1,11 @@
+apiVersion: 1
+providers:
+  - name: Foryn local
+    orgId: 1
+    folder: Foryn
+    type: file
+    disableDeletion: true
+    editable: false
+    updateIntervalSeconds: 15
+    options:
+      path: /var/lib/grafana/dashboards

@@ -1,0 +1,273 @@
+# 생성 출처: https://www.toptal.com/developers/gitignore/api/intellij,java,gradle
+# 편집 주소: https://www.toptal.com/developers/gitignore?templates=intellij,java,gradle
+
+### IntelliJ 설정 ###
+# JetBrains IDE 대상: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm, Rider
+# 참고: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
+
+# IntelliJ IDEA 파일
+.idea/
+# 사용자별 파일
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/dictionaries
+.idea/**/shelf
+
+# AWS 사용자별 파일
+.idea/**/aws.xml
+
+# 생성 파일
+.idea/**/contentModel.xml
+
+# 민감하거나 자주 변경되는 파일
+.idea/**/dataSources/
+.idea/**/dataSources.ids
+.idea/**/dataSources.local.xml
+.idea/**/sqlDataSources.xml
+.idea/**/dynamic.xml
+.idea/**/uiDesigner.xml
+.idea/**/dbnavigator.xml
+
+# Gradle 설정
+.idea/**/gradle.xml
+.idea/**/libraries
+
+# Gradle 및 Maven 자동 가져오기
+# Gradle 또는 Maven의 자동 가져오기를 사용하면 모듈 파일을 제외한다.
+# 해당 파일은 다시 생성되며 불필요한 변경을 만들 수 있다.
+# 자동 가져오기를 사용하면 아래 주석을 해제한다.
+# .idea/artifacts
+# .idea/compiler.xml
+# .idea/jarRepositories.xml
+# .idea/modules.xml
+# .idea/*.iml
+# .idea/modules
+# *.iml
+# *.ipr
+
+# CMake 빌드
+cmake-build-*/
+
+# Mongo Explorer 플러그인
+.idea/**/mongoSettings.xml
+
+# 파일 기반 프로젝트 형식
+*.iws
+
+# IntelliJ 출력
+out/
+
+# mpeltonen/sbt-idea 플러그인
+.idea_modules/
+
+# JIRA 플러그인
+atlassian-ide-plugin.xml
+
+# Cursive Clojure 플러그인
+.idea/replstate.xml
+
+# SonarLint 플러그인
+.idea/sonarlint/
+
+# Crashlytics 플러그인 (Android Studio 및 IntelliJ용)
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+fabric.properties
+
+# 편집기 내 REST 클라이언트
+.idea/httpRequests
+
+# Android Studio 3.1 이상에서 직렬화한 캐시 파일
+.idea/caches/build_file_checksums.ser
+
+### IntelliJ 추가 설정 ###
+# 주석 처리 이유: https://github.com/joeblau/gitignore.io/issues/186#issuecomment-215987721
+
+# *.iml
+# modules.xml
+# .idea/misc.xml
+# *.ipr
+
+# SonarLint 플러그인
+# https://plugins.jetbrains.com/plugin/7973-sonarlint
+.idea/**/sonarlint/
+
+# SonarQube 플러그인
+# https://plugins.jetbrains.com/plugin/7238-sonarqube-community-plugin
+.idea/**/sonarIssues.xml
+
+# Markdown Navigator 플러그인
+# https://plugins.jetbrains.com/plugin/7896-markdown-navigator-enhanced
+.idea/**/markdown-navigator.xml
+.idea/**/markdown-navigator-enh.xml
+.idea/**/markdown-navigator/
+
+# 캐시 파일 생성 버그
+# 참고: https://youtrack.jetbrains.com/issue/JBR-2257
+.idea/$CACHE_FILE$
+
+# CodeStream 플러그인
+# https://plugins.jetbrains.com/plugin/12206-codestream
+.idea/codestream.xml
+
+# Azure Toolkit for IntelliJ 플러그인
+# https://plugins.jetbrains.com/plugin/8053-azure-toolkit-for-intellij
+.idea/**/azureSettings.xml
+
+### Java 설정 ###
+# 컴파일된 클래스 파일
+*.class
+
+# 로그 파일
+*.log
+
+# BlueJ 파일
+*.ctxt
+
+# Java용 모바일 도구 (J2ME)
+.mtj.tmp/
+
+# 패키지 파일 #
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# 가상 머신 충돌 로그. 참고: http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+replay_pid*
+
+### Gradle 설정 ###
+.gradle
+**/build/
+!src/**/build/
+
+# Gradle GUI 설정 제외
+gradle-app.setting
+
+# Gradle 래퍼 JAR 파일은 제외하지 않는다. 일반 JAR 파일은 보통 제외된다.
+!gradle-wrapper.jar
+
+# Gradle 래퍼 속성 파일은 제외하지 않는다.
+!gradle-wrapper.properties
+
+# 프로젝트 캐시
+.gradletasknamecache
+
+# Eclipse Gradle 플러그인이 생성한 파일
+# Eclipse 핵심 설정
+.project
+# JDT 전용 설정 (Eclipse Java 개발 도구)
+.classpath
+
+### Gradle 추가 설정 ###
+# Java 힙 덤프
+*.hprof
+
+# 키 관련 데이터 제거
+/src/main/resources/keys/
+
+# 생성 목록 끝: https://www.toptal.com/developers/gitignore/api/intellij,java,gradle
+HELP.md
+src/main/resources/keys/.env
+
+# 키 관련 데이터
+/src/main/resources/keys/
+
+
+#환경설정파일
+.env
+
+# Terraform 설정
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.tfplan
+# 동일한 공급자 버전을 재현할 수 있도록 .terraform.lock.hcl은 유지한다.
+
+# AWS 관련
+.aws/
+*.pem
+
+#로컬 테스트용 파일
+docker-compose.override.yml
+
+application-local.properties
+src/main/resources/application-local.yml
+
+/src/main/resources/application-local.yml
+
+# 로컬 MySQL/Mongo 데이터 디렉토리 무시
+db_data_dev/
+mongo_data_dev/
+
+# applekey 값 무시
+/src/main/resources/applekey/*
+
+# 인증서
+src/main/resources/certs/*
+
+#firebase 키 파일 무시
+/src/main/resources/mori-firebase-key.json
+
+# VS Code 설정
+.vscode/*
+
+# Gradle 사용자 설정
+.gradle-user-home/*
+
+# 바이너리 출력
+bin
+
+# infra 관측
+infra/observability/cloudrun/*.generated.yaml
+
+# Codex 하네스 프런트엔드 및 템플릿 생성물
+node_modules/
+.next/
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# Codex 하네스 Python 및 테스트 캐시
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Codex 하네스 단계 실행 결과
+phases/**/phase*-output.json
+phases/**/step*-output.json
+
+# 업로드 사본: 로컬 자격증명과 에이전트 실행 상태
+.env.*
+!.env.example
+*.key
+*.p8
+*.p12
+*.pfx
+*.jks
+*.keystore
+**/*firebase*.json
+**/*service-account*.json
+**/*credentials*.json
+.omx/
+.omc/
+.worktrees/
+.codegraph/
+
+# 개인 작업 메모, 실행 계획, 검증 사본
+/.local/
+
+# 개인 설정과 선택적 원격 이슈 작업 절차
+/.agents/skills/caveman/
+/.agents/skills/github-issue-branch/
+
+# 운영체제 메타데이터
+.DS_Store
+Thumbs.db

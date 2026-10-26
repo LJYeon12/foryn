@@ -1,0 +1,297 @@
+plugins {
+    id 'java'
+    id 'checkstyle'
+    id 'jacoco'
+    id 'org.springframework.boot' version '3.5.3'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+
+ext {
+    set('springCloudVersion', "2025.0.0")
+    set('springAiVersion', "1.0.3")
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+    }
+}
+
+group = 'com.forA'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+sourceSets {
+    faultTest {
+        java.srcDir file('src/faultTest/java')
+        compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+    integrationTest {
+        java.srcDir file('src/integrationTest/java')
+        resources.srcDirs files('src/integrationTest/resources', 'src/test/resources')
+        compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+    archTest {
+        java.srcDir file('src/archTest/java')
+        resources.srcDir file('src/archTest/resources')
+        compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+}
+
+configurations {
+    faultTestImplementation {
+        extendsFrom testImplementation
+    }
+    faultTestRuntimeOnly {
+        extendsFrom testRuntimeOnly
+    }
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+    integrationTestImplementation {
+        extendsFrom testImplementation
+    }
+    integrationTestRuntimeOnly {
+        extendsFrom testRuntimeOnly
+    }
+    archTestImplementation {
+        extendsFrom testImplementation
+    }
+    archTestRuntimeOnly {
+        extendsFrom testRuntimeOnly
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // Spring Data MongoDB 연동
+    implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    compileOnly 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    // Spring Security 및 OAuth2 클라이언트
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+    // 애플 인증 서버에 JWK를 가져올 때 사용
+    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
+
+    // 애플 로그인 캐시 설정
+    implementation 'com.github.ben-manes.caffeine:caffeine'
+    // JWT 처리를 위한 라이브러리
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.78'
+    // Swagger API 문서
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    implementation 'io.github.cdimascio:dotenv-java:3.0.0'
+    implementation 'mysql:mysql-connector-java:8.0.33'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    // JUnit 5 테스트
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+
+    // Mockito 모의 객체
+    testImplementation 'org.mockito:mockito-core'
+    testImplementation 'org.mockito:mockito-junit-jupiter'
+
+    // AssertJ (개선된 검증문)
+    testImplementation 'org.assertj:assertj-core'
+
+    // Spring Security Test (인증 테스트용)
+    testImplementation 'org.springframework.security:spring-security-test'
+
+    testImplementation 'com.h2database:h2'
+    testImplementation 'de.flapdoodle.embed:de.flapdoodle.embed.mongo.spring3x:4.24.0'
+    archTestImplementation 'com.tngtech.archunit:archunit-junit5:1.4.1'
+
+    //Firebase 연동
+    implementation 'com.google.firebase:firebase-admin:9.7.0'
+
+    //Flyway (MySQL 마이그레이션)
+    implementation 'org.flywaydb:flyway-mysql'
+
+    // Sentry (에러 추적)
+    implementation 'io.sentry:sentry-spring-boot-starter-jakarta:8.33.0'
+
+    // Prometheus와 Grafana 연결
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // GCP 연동
+    implementation 'com.google.cloud.sql:mysql-socket-factory-connector-j-8:1.28.2'
+    implementation 'com.google.cloud:google-cloud-tasks:2.62.0'
+
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+
+    def embeddedMongoArtifactsDir = file("$buildDir/embedded-mongo/artifacts")
+
+    doFirst {
+        embeddedMongoArtifactsDir.mkdirs()
+    }
+
+    environment 'EMBEDDED_MONGO_ARTIFACTS', embeddedMongoArtifactsDir.absolutePath
+}
+
+tasks.register('integrationTest', Test) {
+    group = 'verification'
+    description = 'Runs Spring integration tests.'
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    useJUnitPlatform()
+    shouldRunAfter tasks.named('test')
+
+    def embeddedMongoArtifactsDir = file("$buildDir/embedded-mongo/artifacts")
+
+    doFirst {
+        embeddedMongoArtifactsDir.mkdirs()
+    }
+
+    environment 'EMBEDDED_MONGO_ARTIFACTS', embeddedMongoArtifactsDir.absolutePath
+}
+
+tasks.register('archTest', Test) {
+    group = 'verification'
+    description = 'Runs architecture rules via ArchUnit.'
+    testClassesDirs = sourceSets.archTest.output.classesDirs
+    classpath = sourceSets.archTest.runtimeClasspath
+    useJUnitPlatform()
+    shouldRunAfter tasks.named('test')
+}
+
+// 명시적으로 실행한다. 폐기 가능한 루프백 MySQL DB가 필요하며 check/build에 포함하지 않는다.
+tasks.named('compileFaultTestJava', JavaCompile) {
+    // 하네스 파일 4개만 사용한다. 소스 변경 후 전체를 함께 컴파일한다.
+    options.incremental = false
+}
+
+tasks.register('outboxFaultTest', Test) {
+    group = 'verification'
+    description = 'Runs local MySQL and separate-JVM Outbox fault experiments.'
+    testClassesDirs = sourceSets.faultTest.output.classesDirs
+    classpath = sourceSets.faultTest.runtimeClasspath
+    useJUnitPlatform()
+    include '**/notification/fault/**'
+    maxParallelForks = 1
+    testLogging {
+        events 'passed', 'failed', 'skipped'
+        showStandardStreams = true
+    }
+    systemProperty 'outbox.fault.classpathFile', layout.buildDirectory.file('outbox-fault-classpath.txt').get().asFile.absolutePath
+    systemProperty 'outbox.fault.evidence', layout.buildDirectory.dir('outbox-fault-evidence').get().asFile.absolutePath
+    outputs.upToDateWhen { false }
+    doFirst {
+        layout.buildDirectory.file('outbox-fault-classpath.txt').get().asFile.text = sourceSets.faultTest.runtimeClasspath.asPath
+    }
+}
+
+// 명시적으로 실행한다. 폐기 가능한 루프백 MySQL과 MongoDB를 사용하며 check/build에 포함하지 않는다.
+tasks.register('reportFaultTest', Test) {
+    group = 'verification'
+    description = 'Compares report transactions, batching, pool ownership and mixed local HTTP load.'
+    testClassesDirs = sourceSets.faultTest.output.classesDirs
+    classpath = sourceSets.faultTest.runtimeClasspath
+    useJUnitPlatform()
+    include '**/report/fault/**'
+    maxParallelForks = 1
+    testLogging {
+        events 'passed', 'failed', 'skipped'
+        showStandardStreams = true
+    }
+    systemProperty 'report.fault.evidence', file('.local/report/experiments/fault-evidence').absolutePath
+    outputs.upToDateWhen { false }
+}
+
+jacoco {
+    toolVersion = '0.8.13'
+}
+
+// 명시적으로 실행한다. 폐기 가능한 실제 MySQL과 Mongo 복제 세트를 사용하며 check/build에 포함하지 않는다.
+tasks.register('chatFaultTest', Test) {
+    group = 'verification'
+    description = 'Checks chat atomicity, compensation, commit uncertainty and process recovery.'
+    testClassesDirs = sourceSets.faultTest.output.classesDirs
+    classpath = sourceSets.faultTest.runtimeClasspath
+    useJUnitPlatform()
+    include '**/chat/fault/**'
+    maxParallelForks = 1
+    outputs.upToDateWhen { false }
+    systemProperty 'chat.fault.evidence', System.getenv('CHAT_FAULT_EVIDENCE') ?: file('.local/chat/experiments/fault-evidence').absolutePath
+    systemProperty 'chat.fault.classpathFile', layout.buildDirectory.file('chat-fault-classpath.txt').get().asFile.absolutePath
+    testLogging {
+        events 'passed', 'failed', 'skipped'
+        showStandardStreams = true
+    }
+    doFirst {
+        layout.buildDirectory.file('chat-fault-classpath.txt').get().asFile.text = sourceSets.faultTest.runtimeClasspath.asPath
+    }
+}
+
+tasks.named('jacocoTestReport') {
+    dependsOn tasks.named('test')
+
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+    }
+
+    def coverageExclusions = [
+            'com/forA/chatbot/ChatbotApplication.class',
+            'com/forA/chatbot/config/**',
+            'com/forA/chatbot/global/config/**'
+    ]
+
+    classDirectories.setFrom(sourceSets.main.output.asFileTree.matching {
+        exclude coverageExclusions
+    })
+}
+
+checkstyle {
+    toolVersion = '10.17.0'
+    configFile = file("$rootDir/config/checkstyle/checkstyle.xml")
+}
+
+tasks.withType(Checkstyle).configureEach {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+tasks.register('lint') {
+    group = 'verification'
+    description = 'Runs Java static analysis via Checkstyle.'
+    dependsOn tasks.named('checkstyleMain'), tasks.named('checkstyleTest')
+}
+
+// 로컬 자격증명을 애플리케이션 산출물에 포함하지 않는다.
+tasks.named('processResources') {
+    exclude '**/*.p8', '**/*.pem', '**/*.p12', '**/*.pfx', '**/*.jks', '**/*.keystore'
+    exclude '**/.env', '**/.env.*', '**/application-local.*'
+    exclude '**/*firebase*.json', '**/*service-account*.json', '**/*credentials*.json'
+    exclude 'keys/**', 'applekey/**'
+}

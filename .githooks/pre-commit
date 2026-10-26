@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+if [ "${SKIP_PRE_COMMIT_CHECKS:-}" = "1" ]; then
+  echo "Skipping pre-commit checks because SKIP_PRE_COMMIT_CHECKS=1."
+  exit 0
+fi
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+echo "Running pre-commit checks: lint, build, test"
+./gradlew lint build test

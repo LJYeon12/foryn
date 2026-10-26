@@ -1,0 +1,8 @@
+# 프로젝트 전용 Codex 설정.
+#
+# 상시 적용할 에이전트 지침은 ../AGENTS.md에 있다.
+# 프로젝트 스킬은 ../.agents/skills/<skill-name>/SKILL.md에 있다.
+
+[features]
+# Codex 수명 주기 훅 활성화 설정.
+hooks = true

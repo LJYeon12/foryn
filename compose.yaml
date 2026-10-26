@@ -1,0 +1,137 @@
+name: foryn-local
+
+x-logging: &local-logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-foryn}
+      MYSQL_USER: ${MYSQL_USER:-foryn}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+    command: [--character-set-server=utf8mb4, --collation-server=utf8mb4_unicode_ci]
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'MYSQL_PWD="$$MYSQL_PASSWORD" mysql --protocol=TCP --host=127.0.0.1 --user="$$MYSQL_USER" "$$MYSQL_DATABASE" --execute="SELECT 1" >/dev/null 2>&1'
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    logging: *local-logging
+
+  mongo:
+    image: mongo:8.0
+    restart: unless-stopped
+    entrypoint: [/bin/bash, /opt/mongo/start-replica.sh]
+    command: [mongod, --replSet, rs0, --bind_ip_all, --keyFile, /data/configdb/replica-set.key]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-foryn_admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?Set MONGO_INITDB_ROOT_PASSWORD in .env}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-foryn}
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+      - ./infra/mongo:/opt/mongo:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'mongosh "mongodb://127.0.0.1:27017/?directConnection=true" --quiet --username "$$MONGO_INITDB_ROOT_USERNAME" --password "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "quit(db.hello().isWritablePrimary ? 0 : 1)" >/dev/null 2>&1'
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+    logging: *local-logging
+
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.retention.size=2GB
+      - --web.enable-remote-write-receiver
+    ports:
+      - "127.0.0.1:9090:9090"
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./infra/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:9090/-/ready]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *local-logging
+
+  grafana:
+    image: grafana/grafana:13.2.3
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    volumes:
+      - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:3000/api/health]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *local-logging
+
+  k6:
+    image: grafana/k6:2.3.0
+    profiles: [load]
+    restart: "no"
+    command: [run, --out, experimental-prometheus-rw, /scripts/read.js]
+    environment:
+      BASE_URL: ${K6_BASE_URL:-http://host.docker.internal:8080}
+      TARGET_PATH: ${K6_TARGET_PATH:-/actuator/health}
+      ACCESS_TOKEN: ${K6_ACCESS_TOKEN:-}
+      VUS: ${K6_VUS:-1}
+      DURATION: ${K6_DURATION:-30s}
+      TEST_ID: ${K6_TEST_ID:-local}
+      K6_NO_USAGE_REPORT: "true"
+      K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
+      K6_PROMETHEUS_RW_TREND_STATS: p(95),p(99),avg,max
+      K6_PROMETHEUS_RW_STALE_MARKERS: "true"
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    volumes:
+      - ./infra/k6:/scripts:ro
+    logging: *local-logging
+
+volumes:
+  mysql-data:
+  mongo-data:
+  mongo-config:
+  prometheus-data:
+  grafana-data:

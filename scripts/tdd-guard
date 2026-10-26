@@ -1,0 +1,196 @@
+#!/usr/bin/env python3
+"""프로젝트 TDD 가드의 명령 실행 주기 관리 CLI."""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import shlex
+import subprocess
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Sequence
+
+STATE_RELATIVE_PATH = ".omx/state/tdd-guard.json"
+DEFAULT_TTL_MINUTES = 120
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def iso(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def state_path(repo_root: Path) -> Path:
+    return repo_root / STATE_RELATIVE_PATH
+
+
+def ensure_state_dir(repo_root: Path) -> None:
+    state_path(repo_root).parent.mkdir(parents=True, exist_ok=True)
+
+
+def read_state(repo_root: Path) -> dict:
+    try:
+        return json.loads(state_path(repo_root).read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def write_state(repo_root: Path, state: dict) -> None:
+    ensure_state_dir(repo_root)
+    state_path(repo_root).write_text(json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def new_state(topic: str, ttl_minutes: int, test_command: str | None = None) -> dict:
+    now = utc_now()
+    return {
+        "version": 1,
+        "active": True,
+        "topic": topic,
+        "ttl_minutes": ttl_minutes,
+        "test_command": test_command,
+        "red_confirmed": False,
+        "red_confirmed_at": None,
+        "red_exit_code": None,
+        "red_output_excerpt": None,
+        "expected_pattern": None,
+        "expires_at": iso(now + timedelta(minutes=ttl_minutes)),
+        "completed_at": None,
+    }
+
+
+def command_to_string(command: Sequence[str]) -> str:
+    return shlex.join(command)
+
+
+def output_excerpt(text: str, limit: int = 4000) -> str:
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "\n...<truncated>"
+
+
+def cmd_start(args: argparse.Namespace, repo_root: Path) -> int:
+    write_state(repo_root, new_state(args.topic, args.ttl_minutes, args.test_command))
+    print(f"TDD cycle started: {args.topic}")
+    return 0
+
+
+def cmd_check(args: argparse.Namespace, repo_root: Path) -> int:
+    if not args.command:
+        print("tdd-guard check requires a command after --", file=sys.stderr)
+        return 2
+    state = read_state(repo_root)
+    if not state:
+        state = new_state("unspecified", DEFAULT_TTL_MINUTES, command_to_string(args.command))
+    proc = subprocess.run(args.command, cwd=repo_root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    combined = proc.stdout or ""
+    if proc.returncode == 0:
+        state.update({
+            "active": True,
+            "red_confirmed": False,
+            "red_exit_code": 0,
+            "red_output_excerpt": output_excerpt(combined),
+            "test_command": command_to_string(args.command),
+            "expected_pattern": args.expect_regex,
+        })
+        write_state(repo_root, state)
+        print("TDD red check did not fail; production edits remain blocked.", file=sys.stderr)
+        return 1
+    if args.expect_regex and not re.search(args.expect_regex, combined):
+        state.update({
+            "active": True,
+            "red_confirmed": False,
+            "red_exit_code": proc.returncode,
+            "red_output_excerpt": output_excerpt(combined),
+            "test_command": command_to_string(args.command),
+            "expected_pattern": args.expect_regex,
+        })
+        write_state(repo_root, state)
+        print("TDD red check failed, but output did not match --expect-regex; production edits remain blocked.", file=sys.stderr)
+        return 1
+    now = utc_now()
+    expires = now + timedelta(minutes=int(state.get("ttl_minutes", DEFAULT_TTL_MINUTES)))
+    state.update({
+        "version": 1,
+        "active": True,
+        "test_command": command_to_string(args.command),
+        "red_confirmed": True,
+        "red_confirmed_at": iso(now),
+        "red_exit_code": proc.returncode,
+        "red_output_excerpt": output_excerpt(combined),
+        "expected_pattern": args.expect_regex,
+        "expires_at": iso(expires),
+        "completed_at": None,
+    })
+    write_state(repo_root, state)
+    print("TDD red confirmed; production edits are allowed until the token expires or green clears it.")
+    return 0
+
+
+def cmd_green(args: argparse.Namespace, repo_root: Path) -> int:
+    if args.command:
+        proc = subprocess.run(args.command, cwd=repo_root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if proc.returncode != 0:
+            sys.stdout.write(proc.stdout or "")
+            print("TDD green command failed; state was not cleared.", file=sys.stderr)
+            return proc.returncode or 1
+    state = read_state(repo_root) or new_state("completed", DEFAULT_TTL_MINUTES)
+    state.update({
+        "active": False,
+        "red_confirmed": False,
+        "completed_at": iso(utc_now()),
+    })
+    write_state(repo_root, state)
+    print("TDD cycle completed/cleared.")
+    return 0
+
+
+def cmd_status(args: argparse.Namespace, repo_root: Path) -> int:
+    print(json.dumps(read_state(repo_root), ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Command-cycle state manager for the Codex TDD guard")
+    sub = parser.add_subparsers(dest="command_name", required=True)
+
+    for name in ("start", "red"):
+        p = sub.add_parser(name)
+        p.add_argument("--topic", required=True)
+        p.add_argument("--ttl-minutes", type=int, default=DEFAULT_TTL_MINUTES)
+        p.add_argument("--test-command")
+        p.set_defaults(func=cmd_start)
+
+    p = sub.add_parser("check")
+    p.add_argument("--expect-regex")
+    p.add_argument("command", nargs=argparse.REMAINDER)
+    p.set_defaults(func=cmd_check)
+
+    p = sub.add_parser("green")
+    p.add_argument("command", nargs=argparse.REMAINDER)
+    p.set_defaults(func=cmd_green)
+
+    p = sub.add_parser("status")
+    p.set_defaults(func=cmd_status)
+    return parser
+
+
+def clean_remainder(command: list[str]) -> list[str]:
+    if command and command[0] == "--":
+        return command[1:]
+    return command
+
+
+def main(argv: Sequence[str] | None = None, *, repo_root: Path | None = None) -> int:
+    args = build_parser().parse_args(list(argv) if argv is not None else None)
+    if hasattr(args, "command"):
+        args.command = clean_remainder(args.command)
+    root = (repo_root or Path.cwd()).resolve()
+    return int(args.func(args, root))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
